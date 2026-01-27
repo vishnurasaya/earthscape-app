@@ -1,0 +1,8 @@
+streamlit
+numpy
+pandas
+scikit-learn
+lightgbm
+shap
+rasterio
+reportlab
