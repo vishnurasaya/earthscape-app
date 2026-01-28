@@ -1,6 +1,6 @@
 # =================================================
 # EarthScape – Surficial Geology Classifier
-# Local Folder Full Pipeline (RF + LightGBM)
+# Local Folder Full Pipeline (RF + LightGBM) – Robust
 # =================================================
 
 import os, glob, time
@@ -33,22 +33,35 @@ for k in ["rf_results", "lgbm_results"]:
 def load_patches(patch_dir):
     patch_dirs = sorted([p for p in glob.glob(os.path.join(patch_dir, "256_50_*")) if os.path.isdir(p)])
     all_patches = {}
+    empty_patches = []
+
     for folder in patch_dirs:
         patch_name = os.path.basename(folder)
         modalities = {}
+
         for tif in glob.glob(os.path.join(folder, "*.tif")):
             key = os.path.splitext(os.path.basename(tif))[0]
             if "geology" in key.lower():
                 continue
             with rio.open(tif) as src:
                 modalities[key] = src.read(1)
-        # Skip patches with missing modalities to prevent pivot errors
-        if len(modalities) > 0:
+
+        if len(modalities) == 0:
+            empty_patches.append(patch_name)
+        else:
             all_patches[patch_name] = modalities
+
+    if empty_patches:
+        st.warning(f"The following patch folders were skipped (missing valid TIFFs): {', '.join(empty_patches)}")
+
     return all_patches
 
 def extract_labels(csv_file, n):
-    df = pd.read_csv(csv_file)
+    if isinstance(csv_file, str):
+        df = pd.read_csv(csv_file)
+    else:
+        # Uploaded CSV from Streamlit file_uploader
+        df = pd.read_csv(csv_file)
     df["dominant"] = df.iloc[:, 1:].idxmax(axis=1)
     return df["dominant"][:n]
 
@@ -63,8 +76,8 @@ def extract_features(patch_data):
                 "mean": np.mean(flat), "median": np.median(flat),
                 "std": np.std(flat)
             })
+
     df = pd.DataFrame(rows)
-    # Check if df is empty to avoid pivot errors
     if df.empty:
         return pd.DataFrame()
     wide = df.pivot_table(index="patch", columns="modality",
@@ -176,10 +189,13 @@ patch_dir = st.sidebar.text_input(
     value=r"C:\Users\vish\Documents\patches"
 )
 
+csv_file_path = r"C:\Users\vish\Documents\patches\areas.csv"
 csv_file = st.sidebar.file_uploader(
-    "Upload areas CSV",
+    "Upload areas CSV (optional, will use default if none uploaded)",
     type=["csv"]
 )
+if csv_file is None:
+    csv_file = csv_file_path
 
 tab1, tab2 = st.tabs(["Random Forest", "LightGBM"])
 
@@ -207,7 +223,7 @@ def render(results):
 with tab1:
     if st.button("Run Random Forest"):
         if not patch_dir or not csv_file:
-            st.error("Please select patch folder and upload CSV first.")
+            st.error("Please select patch folder and provide CSV first.")
         else:
             st.session_state.rf_results = None
             bar = st.progress(0)
@@ -221,7 +237,7 @@ with tab1:
 with tab2:
     if st.button("Run LightGBM"):
         if not patch_dir or not csv_file:
-            st.error("Please select patch folder and upload CSV first.")
+            st.error("Please select patch folder and provide CSV first.")
         else:
             st.session_state.lgbm_results = None
             bar = st.progress(0)
