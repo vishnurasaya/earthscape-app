@@ -23,9 +23,15 @@ st.set_page_config(page_title="EarthScape – Surficial Geology Classifier", lay
 # =================================================
 # Session state
 # =================================================
-for k in ["rf_results", "lgbm_results", "patch_dir"]:
+for k in ["rf_results", "lgbm_results"]:
     if k not in st.session_state:
         st.session_state[k] = None
+
+# =================================================
+# Paths (local folder)
+# =================================================
+base_dir = r"C:\Users\vish\Documents\patches"
+csv_file_path = r"C:\Users\vish\Documents\patches\areas.csv"
 
 # =================================================
 # Data functions
@@ -59,7 +65,8 @@ def extract_features(patch_data):
             rows.append({
                 "patch": patch, "modality": name,
                 "min": np.min(flat), "max": np.max(flat),
-                "mean": np.mean(flat), "median": np.median(flat),
+                "mean": np.mean(flat),
+                "median": np.median(flat),
                 "std": np.std(flat)
             })
     df = pd.DataFrame(rows)
@@ -157,13 +164,10 @@ def run_pipeline(model_choice, base_dir, csv_file, bar, status):
 st.markdown("<h1 style='text-align:center;'>🌍 EarthScape – Surficial Geology Classifier</h1>", unsafe_allow_html=True)
 st.divider()
 
-st.sidebar.header("Select Inputs")
+st.sidebar.header("Paths (read-only)")
 
-base_dir = st.sidebar.text_input(
-    "Select folder containing patches",
-    value=r"C:\Users\vish\Documents\patches"
-)
-csv_file = st.sidebar.file_uploader("Upload areas CSV", type=["csv"])
+st.sidebar.text_input("Patch folder path", value=base_dir, disabled=True)
+st.sidebar.text_input("Areas CSV path", value=csv_file_path, disabled=True)
 
 tab1, tab2 = st.tabs(["Random Forest", "LightGBM"])
 
@@ -190,13 +194,10 @@ def render(results):
 # ---------------- RF ----------------
 with tab1:
     if st.button("Run Random Forest"):
-        if not base_dir or not csv_file:
-            st.error("Please select the folder and upload CSV first.")
-        else:
-            st.session_state.rf_results = None
-            bar = st.progress(0)
-            status = st.empty()
-            st.session_state.rf_results = run_pipeline("Random Forest", base_dir, csv_file, bar, status)
+        st.session_state.rf_results = None
+        bar = st.progress(0)
+        status = st.empty()
+        st.session_state.rf_results = run_pipeline("Random Forest", base_dir, csv_file_path, bar, status)
 
     if st.session_state.rf_results:
         render(st.session_state.rf_results)
@@ -204,13 +205,10 @@ with tab1:
 # ---------------- LGBM ----------------
 with tab2:
     if st.button("Run LightGBM"):
-        if not base_dir or not csv_file:
-            st.error("Please select the folder and upload CSV first.")
-        else:
-            st.session_state.lgbm_results = None
-            bar = st.progress(0)
-            status = st.empty()
-            st.session_state.lgbm_results = run_pipeline("LightGBM", base_dir, csv_file, bar, status)
+        st.session_state.lgbm_results = None
+        bar = st.progress(0)
+        status = st.empty()
+        st.session_state.lgbm_results = run_pipeline("LightGBM", base_dir, csv_file_path, bar, status)
 
     if st.session_state.lgbm_results:
         render(st.session_state.lgbm_results)
