@@ -1,9 +1,9 @@
 # =================================================
 # EarthScape – Surficial Geology Classifier
-# Cloud-Safe Full Pipeline (RF + LightGBM)
+# Local Folder Full Pipeline (RF + LightGBM)
 # =================================================
 
-import os, glob, zipfile, tempfile, time
+import os, glob, time
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -28,21 +28,6 @@ for k in ["rf_results", "lgbm_results", "patch_dir"]:
         st.session_state[k] = None
 
 # =================================================
-# File handling
-# =================================================
-def extract_zip(uploaded_zip):
-    tmpdir = tempfile.mkdtemp()
-    zip_path = os.path.join(tmpdir, uploaded_zip.name)
-
-    with open(zip_path, "wb") as f:
-        f.write(uploaded_zip.getbuffer())
-
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(tmpdir)
-
-    return tmpdir
-
-# =================================================
 # Data functions
 # =================================================
 def load_patches(patch_dir):
@@ -52,16 +37,13 @@ def load_patches(patch_dir):
     for folder in patch_dirs:
         patch_name = os.path.basename(folder)
         modalities = {}
-
         for tif in glob.glob(os.path.join(folder, "*.tif")):
             key = os.path.splitext(os.path.basename(tif))[0]
             if "geology" in key.lower():
                 continue
             with rio.open(tif) as src:
                 modalities[key] = src.read(1)
-
         all_patches[patch_name] = modalities
-
     return all_patches
 
 def extract_labels(csv_file, n):
@@ -71,7 +53,6 @@ def extract_labels(csv_file, n):
 
 def extract_features(patch_data):
     rows = []
-
     for patch, modalities in patch_data.items():
         for name, arr in modalities.items():
             flat = arr.flatten()
@@ -81,7 +62,6 @@ def extract_features(patch_data):
                 "mean": np.mean(flat), "median": np.median(flat),
                 "std": np.std(flat)
             })
-
     df = pd.DataFrame(rows)
     wide = df.pivot_table(index="patch", columns="modality",
                            values=["min", "max", "mean", "median", "std"])
@@ -109,7 +89,6 @@ def load_model(choice):
 # Pipeline
 # =================================================
 def run_pipeline(model_choice, base_dir, csv_file, bar, status):
-
     timings = {}
     start = time.time()
 
@@ -162,7 +141,7 @@ def run_pipeline(model_choice, base_dir, csv_file, bar, status):
 
     # 7 SHAP
     t0 = time.time()
-    bar.progress(95); status.info("Computing SHAP...")
+    bar.progress(95); status.info("Computing SHAP (first 100 samples)...")
     explainer = shap.TreeExplainer(model)
     shap_values = explainer(X_test[:100])
     timings["SHAP"] = time.time() - t0
@@ -178,14 +157,13 @@ def run_pipeline(model_choice, base_dir, csv_file, bar, status):
 st.markdown("<h1 style='text-align:center;'>🌍 EarthScape – Surficial Geology Classifier</h1>", unsafe_allow_html=True)
 st.divider()
 
-st.sidebar.header("Upload Inputs")
+st.sidebar.header("Select Inputs")
 
-zip_file = st.sidebar.file_uploader("Upload patches ZIP", type=["zip"])
+base_dir = st.sidebar.text_input(
+    "Select folder containing patches",
+    value=r"C:\Users\vish\Documents\patches"
+)
 csv_file = st.sidebar.file_uploader("Upload areas CSV", type=["csv"])
-
-if zip_file:
-    st.session_state.patch_dir = extract_zip(zip_file)
-    st.sidebar.success("ZIP extracted successfully")
 
 tab1, tab2 = st.tabs(["Random Forest", "LightGBM"])
 
@@ -212,12 +190,13 @@ def render(results):
 # ---------------- RF ----------------
 with tab1:
     if st.button("Run Random Forest"):
-        if not zip_file or not csv_file:
-            st.error("Please upload both ZIP and CSV first.")
+        if not base_dir or not csv_file:
+            st.error("Please select the folder and upload CSV first.")
         else:
+            st.session_state.rf_results = None
             bar = st.progress(0)
             status = st.empty()
-            st.session_state.rf_results = run_pipeline("Random Forest", st.session_state.patch_dir, csv_file, bar, status)
+            st.session_state.rf_results = run_pipeline("Random Forest", base_dir, csv_file, bar, status)
 
     if st.session_state.rf_results:
         render(st.session_state.rf_results)
@@ -225,19 +204,15 @@ with tab1:
 # ---------------- LGBM ----------------
 with tab2:
     if st.button("Run LightGBM"):
-        if not zip_file or not csv_file:
-            st.error("Please upload both ZIP and CSV first.")
+        if not base_dir or not csv_file:
+            st.error("Please select the folder and upload CSV first.")
         else:
+            st.session_state.lgbm_results = None
             bar = st.progress(0)
             status = st.empty()
-            st.session_state.lgbm_results = run_pipeline("LightGBM", st.session_state.patch_dir, csv_file, bar, status)
+            st.session_state.lgbm_results = run_pipeline("LightGBM", base_dir, csv_file, bar, status)
 
     if st.session_state.lgbm_results:
         render(st.session_state.lgbm_results)
 
 st.caption("EarthScape – Automating Insight. Empowering Geoscience.")
-
-
-
-
-
