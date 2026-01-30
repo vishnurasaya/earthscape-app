@@ -1,7 +1,4 @@
-# =================================================
 # EarthScape – Surficial Geology Classifier
-# Local Folder / ZIP Pipeline (RF + LightGBM)
-# =================================================
 
 import os, glob, zipfile, tempfile, time
 import numpy as np
@@ -15,25 +12,18 @@ from sklearn.ensemble import RandomForestClassifier
 from lightgbm import LGBMClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, cohen_kappa_score
 
-# =================================================
-# Streamlit config – allow large uploads up to 3GB
-# =================================================
-
-# =================================================
 # Page config
-# =================================================
+
 st.set_page_config(page_title="EarthScape – Surficial Geology Classifier", layout="wide")
 
-# =================================================
 # Session state
-# =================================================
+
 for k in ["rf_results", "lgbm_results", "patch_dir"]:
     if k not in st.session_state:
         st.session_state[k] = None
 
-# =================================================
 # File handling for ZIP
-# =================================================
+
 def extract_zip(uploaded_zip):
     tmpdir = tempfile.mkdtemp()
     zip_path = os.path.join(tmpdir, uploaded_zip.name)
@@ -48,9 +38,8 @@ def extract_zip(uploaded_zip):
 
     return tmpdir
 
-# =================================================
 # Data functions
-# =================================================
+
 def load_patches(patch_dir):
     patch_dirs = sorted([p for p in glob.glob(os.path.join(patch_dir, "256_50_*")) if os.path.isdir(p)])
     all_patches = {}
@@ -91,9 +80,8 @@ def extract_features(patch_data):
     wide.columns = [f"{s}_{m}" for s, m in wide.columns]
     return wide.reset_index(drop=True)
 
-# =================================================
 # Models
-# =================================================
+
 def load_model(choice):
     if choice == "Random Forest":
         return RandomForestClassifier(
@@ -108,9 +96,8 @@ def load_model(choice):
             random_state=42
         )
 
-# =================================================
 # Pipeline
-# =================================================
+
 def run_pipeline(model_choice, patch_dir, csv_file, bar, status):
     timings = {}
     start = time.time()
@@ -182,9 +169,8 @@ def run_pipeline(model_choice, patch_dir, csv_file, bar, status):
 
     return metrics, preds, y_test, shap_values, timings
 
-# =================================================
 # UI
-# =================================================
+
 st.markdown("<h1 style='text-align:center;'>🌍 EarthScape – Surficial Geology Classifier</h1>", unsafe_allow_html=True)
 st.divider()
 
